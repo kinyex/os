@@ -15,13 +15,13 @@ int main(int argc, char **argv) {
 
 	pid_t pid = getpid();
 
-	int32_t file = open(argv[1], O_CREAT | O_TRUNC, 0600);
+	int32_t file = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	if (file == -1) {
 		const char msg[] = "error: failed to open requested file\n";
 		write(STDERR_FILENO, msg, sizeof(msg));
 		exit(EXIT_FAILURE);
 	}
-
+	
 	while (bytes = read(STDIN_FILENO, buf, sizeof(buf))) {
 		if (bytes < 0) {
 			const char msg[] = "error: failed to read from stdin\n";
@@ -32,7 +32,8 @@ int main(int argc, char **argv) {
 		len = 0;
 		for (uint32_t i = 0; i < bytes; ++i) {
 			char ch = buf[i];
-			if (ch == 'a' || ch == 'o' || ch == 'u' || ch == 'i' || ch == 'e' || ch == 'y') continue;
+			char lch = tolower(buf[i]);
+			if (lch == 'a' || lch == 'o' || lch == 'u' || lch == 'i' || lch == 'e' || lch == 'y') continue;
 			buf1[len] = ch;
 			len++;
 		}
@@ -58,11 +59,6 @@ int main(int argc, char **argv) {
 				exit(EXIT_FAILURE);
 			}
 		}
-	}
-
-	if (bytes == 0) {
-		const char term = '\0';
-		write(file, &term, sizeof(term));
 	}
 
 	close(file);

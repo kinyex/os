@@ -19,8 +19,7 @@ int main(int argc, char **argv) {
 
 	char progpath[1024];
 	{
-		ssize_t len = readlink("/proc/self/exe", progpath,
-		                       sizeof(progpath) - 1);
+		ssize_t len = readlink("/proc/self/exe", progpath, sizeof(progpath) - 1);
 		if (len == -1) {
 			const char msg[] = "error: failed to read full program path\n";
 			write(STDERR_FILENO, msg, sizeof(msg));
@@ -47,20 +46,6 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	int client_to_server2[2];
-	if (pipe(client_to_server2) == -1) {
-		const char msg[] = "error: failed to create pipe\n";
-		write(STDERR_FILENO, msg, sizeof(msg));
-		exit(EXIT_FAILURE);
-	}
-
-	int server_to_client2[2];
-	if (pipe(server_to_client2) == -1) {
-		const char msg[] = "error: failed to create pipe\n";
-		write(STDERR_FILENO, msg, sizeof(msg));
-		exit(EXIT_FAILURE);
-	}
-
 	const pid_t child = fork();
 
 	switch (child) {
@@ -70,14 +55,12 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	} break;
 	case 0: {
-		{
-			pid_t pid = getpid();
+		pid_t pid = getpid();
 
-			char msg[64];
-			const int32_t length = snprintf(msg, sizeof(msg),
-				"%d: I'm a child\n", pid);
-			write(STDOUT_FILENO, msg, length);
-		}
+		char msg[64];
+		const int32_t length = snprintf(msg, sizeof(msg),
+			"%d: I'm a child\n", pid);
+		write(STDOUT_FILENO, msg, length);
 
 		close(client_to_server1[1]);
 		close(server_to_client1[0]);
@@ -102,6 +85,20 @@ int main(int argc, char **argv) {
 		}
 	} break;
 	default: {
+		int client_to_server2[2];
+		if (pipe(client_to_server2) == -1) {
+			const char msg[] = "error: failed to create pipe\n";
+			write(STDERR_FILENO, msg, sizeof(msg));
+			exit(EXIT_FAILURE);
+		}
+
+		int server_to_client2[2];
+		if (pipe(server_to_client2) == -1) {
+			const char msg[] = "error: failed to create pipe\n";
+			write(STDERR_FILENO, msg, sizeof(msg));
+			exit(EXIT_FAILURE);
+		}
+
 		const pid_t childchild = fork();
 
 		switch (childchild) {
@@ -127,19 +124,17 @@ int main(int argc, char **argv) {
 			dup2(server_to_client2[1], STDOUT_FILENO);
 			close(server_to_client2[1]);
 
-			{
-				char path[1024];
-				snprintf(path, sizeof(path) - 1, "%s/%s", progpath, SERVER_PROGRAM_NAME);
+			char path[1024];
+			snprintf(path, sizeof(path) - 1, "%s/%s", progpath, SERVER_PROGRAM_NAME);
 
-				char *const args[] = {SERVER_PROGRAM_NAME, argv[2], "2", NULL};
+			char *const args[] = {SERVER_PROGRAM_NAME, argv[2], "2", NULL};
 
-				int32_t status = execv(path, args);
+			int32_t status = execv(path, args);
 
-				if (status == -1) {
-					const char msg[] = "error: failed to exec into new exectuable image\n";
-					write(STDERR_FILENO, msg, sizeof(msg));
-					exit(EXIT_FAILURE);
-				}
+			if (status == -1) {
+				const char msg[] = "error: failed to exec into new exectuable image\n";
+				write(STDERR_FILENO, msg, sizeof(msg));
+				exit(EXIT_FAILURE);
 			}
 		} break;
 		default: {
@@ -163,10 +158,10 @@ int main(int argc, char **argv) {
 					const char msg[] = "error: failed to read from stdin\n";
 					write(STDERR_FILENO, msg, sizeof(msg));
 					exit(EXIT_FAILURE);
-				} else if (buf[0] == '\n') {
+				}
+				if (buf[0] == '\n') {
 					break;
 				}
-
 				if (bytes > 11) {
 					write(client_to_server2[1], buf, bytes);
 
