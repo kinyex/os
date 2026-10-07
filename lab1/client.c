@@ -12,25 +12,24 @@ static char SERVER_PROGRAM_NAME[] = "server";
 int main(int argc, char **argv) {
 	if (argc <= 2) {
 		char msg[1024];
-		uint32_t len = snprintf(msg, sizeof(msg) - 1, "usage: %s filename1 filename2\n", argv[0]);
+		uint32_t len = snprintf(msg, sizeof(msg), "usage: %s filename1 filename2\n", argv[0]);
 		write(STDERR_FILENO, msg, len);
 		exit(EXIT_SUCCESS);
 	}
 
 	char progpath[1024];
-	{
-		ssize_t len = readlink("/proc/self/exe", progpath, sizeof(progpath) - 1);
-		if (len == -1) {
-			const char msg[] = "error: failed to read full program path\n";
-			write(STDERR_FILENO, msg, sizeof(msg));
-			exit(EXIT_FAILURE);
-		}
-
-		while (progpath[len] != '/')
-			--len;
-
-		progpath[len] = '\0';
+	ssize_t len = readlink("/proc/self/exe", progpath, sizeof(progpath) - 1);
+	if (len == -1) {
+		const char msg[] = "error: failed to read full program path\n";
+		write(STDERR_FILENO, msg, sizeof(msg));
+		exit(EXIT_FAILURE);
 	}
+
+	while (progpath[len] != '/') {
+		--len;
+	}
+
+	progpath[len] = '\0';
 
 	int client_to_server1[2];
 	if (pipe(client_to_server1) == -1) {
@@ -58,8 +57,7 @@ int main(int argc, char **argv) {
 		pid_t pid = getpid();
 
 		char msg[64];
-		const int32_t length = snprintf(msg, sizeof(msg),
-			"%d: I'm a child\n", pid);
+		const int32_t length = snprintf(msg, sizeof(msg), "%d: I'm a child\n", pid);
 		write(STDOUT_FILENO, msg, length);
 
 		close(client_to_server1[1]);
@@ -159,21 +157,16 @@ int main(int argc, char **argv) {
 					write(STDERR_FILENO, msg, sizeof(msg));
 					exit(EXIT_FAILURE);
 				}
-				if (buf[0] == '\n') {
+				else if (buf[0] == '\n') {
 					break;
 				}
-				if (bytes > 11) {
-					write(client_to_server2[1], buf, bytes);
 
-					bytes = read(server_to_client2[0], buf, sizeof(buf));
-					write(STDOUT_FILENO, buf, bytes);
-				}
-				else {
-					write(client_to_server1[1], buf, bytes);
+				int* client_to_server = bytes > 11 ? &client_to_server2[0] : &client_to_server1[0];
+				int* server_to_client = bytes > 11 ? &server_to_client2[0] : &server_to_client1[0];
 
-					bytes = read(server_to_client1[0], buf, sizeof(buf));
-					write(STDOUT_FILENO, buf, bytes);
-				}
+				write(client_to_server[1], buf, bytes);
+				bytes = read(server_to_client[0], buf, sizeof(buf));
+				write(STDOUT_FILENO, buf, bytes);
 			}
 
 			close(client_to_server1[1]);
