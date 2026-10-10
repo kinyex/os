@@ -175,6 +175,7 @@ int main(int argc, char **argv) {
 			close(server_to_client2[0]);
 
 			wait(NULL);
+			wait(NULL);
 		} break;
 		}
 	} break;
