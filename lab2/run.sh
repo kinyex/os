@@ -32,8 +32,8 @@ echo "32 threads:"
 
 echo
 echo "1024 threads:"
-./main $file $len 1024 -q
+./main $file $len 1024
 
 echo
 echo "8192 threads:"
-./main $file $len 8192 -q
+./main $file $len 8192
