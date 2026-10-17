@@ -1,7 +1,7 @@
 file="array"
 len=$1
 
-cc main.c -o main 2> /dev/null
+cc main.c -pthread -o main 2> /dev/null
 cc genarray.c -o genarray 2> /dev/null
 
 ./genarray $file $len
