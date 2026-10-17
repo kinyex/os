@@ -17,7 +17,7 @@ typedef struct {
 	size_t n_threads;
 	char* filename;
     int* arr;
-    bool quiet;
+    bool verbose;
     int min;
     int max;
 } ThreadArgs;
@@ -40,7 +40,7 @@ static void* work(void* _args)
         }
     }
 
-	if (!args->quiet) {
+	if (args->verbose) {
         printf("Thread #%ld says min-max is: %d-%d\n", args->number, min, max);
     }
 
@@ -54,11 +54,11 @@ int main(int argc, char** argv)
 {
 	if (argc <= 3) {
 		char msg[1024];
-		uint32_t len = snprintf(msg, sizeof(msg), "usage: %s filename array-size number-of-threads [-q]\n", argv[0]);
+		uint32_t len = snprintf(msg, sizeof(msg), "usage: %s filename array-size number-of-threads [-v]\n", argv[0]);
 		write(STDERR_FILENO, msg, len);
 		exit(EXIT_SUCCESS);
 	}
-    bool quiet = argc > 4 && argv[4][0] == '-' && argv[4][1] == 'q';
+    bool verbose = argc > 4 && argv[4][0] == '-' && argv[4][1] == 'v';
 
 	size_t n_threads = atoi(argv[3]);
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 			.n_threads = n_threads,
 			.filename = argv[1],
             .arr = arr,
-            .quiet = quiet,
+            .verbose = verbose,
 		};
 
 		pthread_create(&threads[i], NULL, work, &thread_args[i]);
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     gettimeofday(&end, NULL);
     double time_taken = end.tv_sec + end.tv_usec / 1e6 - start.tv_sec - start.tv_usec / 1e6;
 
-    printf("Final min-max: %d-%d\n", min, max);
+    printf("Min-max: %d-%d\n", min, max);
     printf("Time: %f\n", time_taken);
 
     free(arr);
