@@ -1,11 +1,22 @@
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #include <unistd.h>
-#include <sys/wait.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
+#include <sys/fcntl.h>
+#include <wait.h>
+#include <semaphore.h>
+#include <sys/mman.h>
+
+#define SHM_SIZE 4096
+
+const char SHM_NAME[] = "example-shm";
+const char SEM_NAME[] = "example-sem";
 
 static char SERVER_PROGRAM_NAME[] = "server";
 
@@ -31,18 +42,32 @@ int main(int argc, char **argv) {
 
 	progpath[len] = '\0';
 
-	int client_to_server1[2];
-	if (pipe(client_to_server1) == -1) {
-		const char msg[] = "error: failed to create pipe\n";
+	int shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_TRUNC, 0600);
+	if (shm == -1) {
+		const char msg[] = "error: failed to create SHM\n";
 		write(STDERR_FILENO, msg, sizeof(msg));
-		exit(EXIT_FAILURE);
+		_exit(EXIT_FAILURE);
 	}
 
-	int server_to_client1[2];
-	if (pipe(server_to_client1) == -1) {
-		const char msg[] = "error: failed to create pipe\n";
+	if (ftruncate(shm, SHM_SIZE) == -1) {
+		const char msg[] = "error: failed to resize SHM\n";
 		write(STDERR_FILENO, msg, sizeof(msg));
-		exit(EXIT_FAILURE);
+		_exit(EXIT_FAILURE);
+	}
+
+	char *shm_buf = mmap(NULL, SHM_SIZE, PROT_WRITE, MAP_SHARED, shm, 0);
+	if (shm_buf == MAP_FAILED) {
+		const char msg[] = "error: failed to map SHM\n";
+		write(STDERR_FILENO, msg, sizeof(msg));
+		_exit(EXIT_FAILURE);
+	}
+
+	sem_unlink(SEM_NAME);
+	sem_t *sem = sem_open(SEM_NAME, O_RDWR | O_CREAT | O_TRUNC, 0600, 1);
+	if (sem == SEM_FAILED) {
+		const char msg[] = "error: failed to create semaphore\n";
+		write(STDERR_FILENO, msg, sizeof(msg));
+		_exit(EXIT_FAILURE);
 	}
 
 	const pid_t child = fork();
@@ -60,15 +85,6 @@ int main(int argc, char **argv) {
 		const int32_t length = snprintf(msg, sizeof(msg), "%d: I'm a child\n", pid);
 		write(STDOUT_FILENO, msg, length);
 
-		close(client_to_server1[1]);
-		close(server_to_client1[0]);
-
-		dup2(client_to_server1[0], STDIN_FILENO);
-		close(client_to_server1[0]);
-
-		dup2(server_to_client1[1], STDOUT_FILENO);
-		close(server_to_client1[1]);
-
 		char path[1024];
 		snprintf(path, sizeof(path) - 1, "%s/%s", progpath, SERVER_PROGRAM_NAME);
 
@@ -83,19 +99,6 @@ int main(int argc, char **argv) {
 		}
 	} break;
 	default: {
-		int client_to_server2[2];
-		if (pipe(client_to_server2) == -1) {
-			const char msg[] = "error: failed to create pipe\n";
-			write(STDERR_FILENO, msg, sizeof(msg));
-			exit(EXIT_FAILURE);
-		}
-
-		int server_to_client2[2];
-		if (pipe(server_to_client2) == -1) {
-			const char msg[] = "error: failed to create pipe\n";
-			write(STDERR_FILENO, msg, sizeof(msg));
-			exit(EXIT_FAILURE);
-		}
 
 		const pid_t childchild = fork();
 
@@ -112,15 +115,6 @@ int main(int argc, char **argv) {
 			const int32_t length = snprintf(msg, sizeof(msg),
 				"%d: I'm a child\n", pid);
 			write(STDOUT_FILENO, msg, length);
-
-			close(client_to_server2[1]);
-			close(server_to_client2[0]);
-
-			dup2(client_to_server2[0], STDIN_FILENO);
-			close(client_to_server2[0]);
-
-			dup2(server_to_client2[1], STDOUT_FILENO);
-			close(server_to_client2[1]);
 
 			char path[1024];
 			snprintf(path, sizeof(path) - 1, "%s/%s", progpath, SERVER_PROGRAM_NAME);
@@ -143,39 +137,43 @@ int main(int argc, char **argv) {
 				"%d: I'm a parent, my children has PID %d and PID %d\n", pid, child, childchild);
 			write(STDOUT_FILENO, msg, length);
 
-			close(client_to_server1[0]);
-			close(server_to_client1[1]);
-			close(client_to_server2[0]);
-			close(server_to_client2[1]);
-
-			char buf[4096];
+			char buf[SHM_SIZE];
 			ssize_t bytes;
 
 			while (bytes = read(STDIN_FILENO, buf, sizeof(buf))) {
+				sem_wait(sem);
+
+				uint32_t* shm_length = (uint32_t*)shm_buf;
+				char* id = shm_buf + sizeof(uint32_t);
+				char* text = shm_buf + sizeof(uint32_t) + sizeof(char);
+
 				if (bytes < 0) {
+					*shm_length = UINT32_MAX;
+					sem_post(sem);
 					const char msg[] = "error: failed to read from stdin\n";
 					write(STDERR_FILENO, msg, sizeof(msg));
 					exit(EXIT_FAILURE);
 				}
 				else if (buf[0] == '\n') {
+					sem_post(sem);
 					break;
 				}
 
-				int* client_to_server = bytes > 11 ? &client_to_server2[0] : &client_to_server1[0];
-				int* server_to_client = bytes > 11 ? &server_to_client2[0] : &server_to_client1[0];
+				*shm_length = bytes;
+				memcpy(id, bytes > 11 ? "2" : "1", sizeof(char));
+				memcpy(text, buf, bytes);
 
-				write(client_to_server[1], buf, bytes);
-				bytes = read(server_to_client[0], buf, sizeof(buf));
-				write(STDOUT_FILENO, buf, bytes);
+				sem_post(sem);
 			}
-
-			close(client_to_server1[1]);
-			close(server_to_client1[0]);
-			close(client_to_server2[1]);
-			close(server_to_client2[0]);
+			*(uint32_t*)shm_buf = UINT32_MAX;
 
 			wait(NULL);
 			wait(NULL);
+			sem_unlink(SEM_NAME);
+			sem_close(sem);
+			munmap(shm_buf, SHM_SIZE);
+			shm_unlink(SHM_NAME);
+			close(shm);
 		} break;
 		}
 	} break;
