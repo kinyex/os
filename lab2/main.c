@@ -62,10 +62,25 @@ int main(int argc, char** argv)
 	size_t n_threads = atoi(argv[3]);
 
 	pthread_t *threads = malloc(n_threads * sizeof(pthread_t));
+    if (threads == NULL) {
+        const char msg[] = "error: failed to allocate memory\n";
+        write(STDERR_FILENO, msg, sizeof(msg));
+        exit(EXIT_FAILURE);
+    }
 	ThreadArgs *thread_args = malloc(n_threads * sizeof(ThreadArgs));
+    if (thread_args == NULL) {
+        const char msg[] = "error: failed to allocate memory\n";
+        write(STDERR_FILENO, msg, sizeof(msg));
+        exit(EXIT_FAILURE);
+    }
 
     ssize_t bytes;
     int* arr = (int*)malloc(atoi(argv[2]) * sizeof(int));
+    if (arr == NULL) {
+        const char msg[] = "error: failed to allocate memory\n";
+        write(STDERR_FILENO, msg, sizeof(msg));
+        exit(EXIT_FAILURE);
+    }
     int32_t file = open(argv[1], O_RDONLY);
 	bytes = read(file, arr, atoi(argv[2]) * sizeof(int));
     close(file);
@@ -99,7 +114,7 @@ int main(int argc, char** argv)
             max = thread_args[i].max;
         }
     }
-    
+
     gettimeofday(&end, NULL);
     double time_taken = end.tv_sec + end.tv_usec / 1e6 - start.tv_sec - start.tv_usec / 1e6;
 

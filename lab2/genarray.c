@@ -22,6 +22,11 @@ int main(int argc, char **argv)
     srand(time(NULL));
     int32_t file = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0600);
     int* buf = (int*)malloc(atoi(argv[2]) * sizeof(int));
+    if (buf == NULL) {
+        const char msg[] = "error: failed to allocate memory\n";
+        write(STDERR_FILENO, msg, sizeof(msg));
+        exit(EXIT_FAILURE);
+    }
     
     for (size_t i = 0; i < atoi(argv[2]); i++) {
         int value = rand();
