@@ -37,3 +37,4 @@ echo "1024 threads:"
 echo
 echo "8192 threads:"
 ./main $file $len 8192
+#
