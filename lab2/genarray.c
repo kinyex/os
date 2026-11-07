@@ -21,11 +21,9 @@ int main(int argc, char **argv)
     
     srand(time(NULL));
     int32_t file = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0600);
-    size_t len = atoi(argv[2]) * sizeof(int);
-    int* buf = (int*)malloc(len);
+    int* buf = (int*)malloc(atoi(argv[2]) * sizeof(int));
     
-    int i = 0;
-    for (; i < atoi(argv[2]); i++) {
+    for (size_t i = 0; i < atoi(argv[2]); i++) {
         int value = rand();
         buf[i] = value;
     }

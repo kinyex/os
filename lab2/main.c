@@ -15,7 +15,6 @@ typedef struct {
 	size_t number;
 	size_t size;
 	size_t n_threads;
-	char* filename;
     int* arr;
     bool verbose;
     int min;
@@ -66,12 +65,10 @@ int main(int argc, char** argv)
 	ThreadArgs *thread_args = malloc(n_threads * sizeof(ThreadArgs));
 
     ssize_t bytes;
-    size_t len = atoi(argv[2]) * sizeof(int);
-    int* arr = (int*)malloc(len);
+    int* arr = (int*)malloc(atoi(argv[2]) * sizeof(int));
     int32_t file = open(argv[1], O_RDONLY);
-	bytes = read(file, arr, len);
+	bytes = read(file, arr, atoi(argv[2]) * sizeof(int));
     close(file);
-
 
     struct timeval start, end;
     gettimeofday(&start, NULL);
@@ -81,7 +78,6 @@ int main(int argc, char** argv)
 			.number = i,
 			.size = atoi(argv[2]),
 			.n_threads = n_threads,
-			.filename = argv[1],
             .arr = arr,
             .verbose = verbose,
 		};
@@ -103,6 +99,7 @@ int main(int argc, char** argv)
             max = thread_args[i].max;
         }
     }
+    
     gettimeofday(&end, NULL);
     double time_taken = end.tv_sec + end.tv_usec / 1e6 - start.tv_sec - start.tv_usec / 1e6;
 
