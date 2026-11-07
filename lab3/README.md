@@ -1,4 +1,4 @@
-# Lab 1
+# Lab 3
 ### Compiling
 `cc client.c -o client && cc server.c -o server`
 > ignore warnings
