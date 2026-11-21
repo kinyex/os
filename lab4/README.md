@@ -1,4 +1,5 @@
 # Lab 4
 ### Running
-`./run1`
-`./run2`
+`./run1.sh`
+
+`./run2.sh`
